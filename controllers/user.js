@@ -1,39 +1,73 @@
 const { response } = require('express');
+const bcryptjs = require('bcryptjs');
 
-const userGet = (req, res) => {
-    const params = req.query;
-    const headers = req.headers;
-    const cookies = req.cookies;
+const User = require('../models/user');
+
+const userGet = async (req, res) => {
+
+    const { limite = 5, desde = 0 } = req.query;
+    const query = {status: true};
+
+    const [ total, users ] = await Promise.all([
+        User.countDocuments(query),
+        User.find(query)
+            .skip(Number( desde ))
+            .limit(Number( limite ))
+    ])
+    
     res.json({
-        message: 'Get',
-        params,
-        headers,
-        cookies
-    })
+        total,
+        users
+    });
 };
 
-const userPost = (req, res) => {
+const userPost = async(req, res = response) => {
 
-    const {name, age} = req.body;
+    const {name, mail, password, role} = req.body;
+    const user = new User({name, mail, password, role});
+
+    // Encriptar la password
+    const salt = bcryptjs.genSaltSync();
+    user.password = bcryptjs.hashSync(password, salt);
+
+    // Persistencia
+    await user.save();
+
     res.json({
         message: 'Post',
-        name,
-        age
+        user
     });
 }
 
-const userPut = (req, res) => {
+const userPut = async (req, res) => {
 
-    const id = req.params.id;
+    const { id } = req.params;
+    const { _id, password, google, mail, ...resto } = req.body;
+
+    //TODO validar contra BD
+    if (password) {
+        // Encriptar la password
+        const salt = bcryptjs.genSaltSync();
+        resto.password = bcryptjs.hashSync(password, salt);
+    }
+
+    const userDb = await User.findByIdAndUpdate(id, resto);
+
     res.json({
         message: 'Put',
-        id
+        userDb
     })
 }
 
-const userDelete = (req, res) => {
+const userDelete = async (req, res) => {
+
+    const { id } = req.params;
+
+    const user = await User.findByIdAndUpdate(id, {status: false});
+
+
     res.json({
-        message: 'Delete'
+        user
     })
 }
 
